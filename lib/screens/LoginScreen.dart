@@ -70,7 +70,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 24),
                         Text(
                           'Connect. Trade. Grow.',
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.w700,
                             color: Colors.black87,
@@ -80,7 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         Text(
                           "India's trusted marketplace for\nfarmers and agri business.",
                           textAlign: TextAlign.center,
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             fontSize: 14,
                             color: Colors.black54,
                             height: 1.5,
@@ -115,12 +115,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   Text(
                     'Enter Mobile Number',
-                    style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.black87),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.black87),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     "We'll send you a 6-digit OTP",
-                    style: GoogleFonts.poppins(fontSize: 13, color: Colors.black54),
+                    style: TextStyle(fontSize: 13, color: Colors.black54),
                   ),
                   const SizedBox(height: 16),
 
@@ -137,7 +137,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: Row(
                             children: [
                               Text('+91',
-                                  style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 15, color: Colors.black87)),
+                                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: Colors.black87)),
                               const Icon(Icons.arrow_drop_down, size: 20, color: Colors.black54),
                             ],
                           ),
@@ -147,17 +147,17 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: TextField(
                             controller: _phoneController,
                             keyboardType: TextInputType.phone,
-                            style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w500, color: Colors.black87),
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: Colors.black87),
                             decoration: InputDecoration(
                               hintText: 'Enter Mobile Number',
-                              hintStyle: GoogleFonts.poppins(color: Colors.black38, fontSize: 15),
+                              hintStyle: TextStyle(color: Colors.black38, fontSize: 15),
                               border: InputBorder.none,
                               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
                               suffixIcon: TextButton(
                                 onPressed: () {},
                                 child: Text(
                                   'Resend OTP',
-                                  style: GoogleFonts.poppins(
+                                  style: TextStyle(
                                     color: const Color(0xFFD32F2F),
                                     fontWeight: FontWeight.w600,
                                     fontSize: 13,
@@ -175,12 +175,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   Text(
                     'Enter OTP',
-                    style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.black87),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.black87),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Enter the 6-digit code sent to your mobile number',
-                    style: GoogleFonts.poppins(fontSize: 13, color: Colors.black54),
+                    style: TextStyle(fontSize: 13, color: Colors.black54),
                   ),
                   const SizedBox(height: 18),
 
@@ -197,7 +197,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           textAlign: TextAlign.center,
                           maxLength: 1,
                           keyboardType: TextInputType.number,
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w700,
                             color: Colors.black87,
@@ -240,7 +240,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         children: [
                           Text(
                             'Submit & Continue',
-                            style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
                           ),
                           const SizedBox(width: 8),
                           const Icon(Icons.arrow_forward, size: 18, color: Colors.white),
@@ -259,7 +259,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
                           'Login With Google',
-                          style: GoogleFonts.poppins(fontSize: 13, color: Colors.black45, fontWeight: FontWeight.w500),
+                          style: TextStyle(fontSize: 13, color: Colors.black45, fontWeight: FontWeight.w500),
                         ),
                       ),
                       const Expanded(child: Divider(color: Colors.black12)),
@@ -288,7 +288,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(width: 12),
                           Text(
                             'Continue with Google',
-                            style: GoogleFonts.poppins(
+                            style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
                               color: Colors.black87,
@@ -309,7 +309,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(width: 6),
                       Text(
                         'Your Data is safe and secure with us.',
-                        style: GoogleFonts.poppins(fontSize: 12, color: Colors.black54, fontWeight: FontWeight.w500),
+                        style: TextStyle(fontSize: 12, color: Colors.black54, fontWeight: FontWeight.w500),
                       ),
                     ],
                   ),
@@ -318,7 +318,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: RichText(
                       textAlign: TextAlign.center,
                       text: TextSpan(
-                        style: GoogleFonts.poppins(fontSize: 12, color: Colors.black45, height: 1.4),
+                        style: TextStyle(fontSize: 12, color: Colors.black45, height: 1.4),
                         children: [
                           const TextSpan(text: 'By continuing, you agree to our \n'),
                           TextSpan(
