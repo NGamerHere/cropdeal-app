@@ -1,6 +1,7 @@
-import 'package:cropdeal/screens/NewLoginScreen.dart';
+import 'package:cropdeal/screens/LoginScreen.dart';
 import 'package:cropdeal/screens/MainLoadingScreen.dart';
 import 'package:cropdeal/screens/OnBoardingScreen.dart';
+import 'package:cropdeal/screens/featureScreen.dart';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -20,7 +21,8 @@ class MyApp extends StatelessWidget {
       ),
       routes: {
         '/loading': (context) => MainLoadingScreen(),
-        '/onboarding': (context) => OnboardingScreen(),
+        '/features': (context) => FeaturesScreen(),
+        '/onboarding': (context) => OnBoardingScreen(),
         '/login': (context) => LoginScreen(),
       },
     );

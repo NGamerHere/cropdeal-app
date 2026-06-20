@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({super.key});
+class FeaturesScreen extends StatefulWidget {
+  const FeaturesScreen({super.key});
 
   @override
-  State<OnboardingScreen> createState() => _OnboardingScreenState();
+  State<FeaturesScreen> createState() => _FeaturesScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen> {
+class _FeaturesScreenState extends State<FeaturesScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
