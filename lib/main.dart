@@ -1,3 +1,4 @@
+import 'package:cropdeal/screens/CategoryScreen.dart';
 import 'package:cropdeal/screens/LoginScreen.dart';
 import 'package:cropdeal/screens/MainLoadingScreen.dart';
 import 'package:cropdeal/screens/OnBoardingScreen.dart';
@@ -29,6 +30,11 @@ class MyApp extends StatelessWidget {
         '/features': (context) => FeaturesScreen(),
         '/onboarding': (context) => OnBoardingScreen(),
         '/login': (context) => LoginScreen(),
+        '/categories': (context) => const CategoryScreen(),
+        '/list': (context) => Scaffold(
+          appBar: AppBar(title: const Text('Products')),
+          body: const Center(child: Text('List page - coming soon')),
+        ),
       },
     );
   }

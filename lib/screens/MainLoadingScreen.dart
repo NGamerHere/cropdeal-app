@@ -4,7 +4,7 @@ import 'package:cropdeal/models/UserRole.dart';
 import 'package:cropdeal/services/ApiClient.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_mlkit_translation/google_mlkit_translation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../stateNotifiers/AppConfigNotifier.dart';
 
@@ -16,7 +16,8 @@ class MainLoadingScreen extends ConsumerStatefulWidget {
 }
 
 class _MainLoadingScreenState extends ConsumerState<MainLoadingScreen> {
-  String currentStat='';
+  String currentStat = '';
+
   @override
   void initState() {
     super.initState();
@@ -24,56 +25,69 @@ class _MainLoadingScreenState extends ConsumerState<MainLoadingScreen> {
   }
 
   Future<void> _downloadModelsAndNavigate() async {
-    setState(() {
-      currentStat = 'Setting up translation models...';
-    });
-    // final modelManager = OnDeviceTranslatorModelManager();
-    //
-    // if (!await modelManager.isModelDownloaded(TranslateLanguage.english.bcpCode)) {
-    //   await modelManager.downloadModel(TranslateLanguage.english.bcpCode);
-    // }
-    // if (!await modelManager.isModelDownloaded(TranslateLanguage.hindi.bcpCode)) {
-    //   await modelManager.downloadModel(TranslateLanguage.hindi.bcpCode);
-    // }
-    // if (!await modelManager.isModelDownloaded(TranslateLanguage.telugu.bcpCode)) {
-    //   await modelManager.downloadModel(TranslateLanguage.telugu.bcpCode);
-    // }
+    setState(() => currentStat = 'Setting up...');
 
-    await Future.delayed(const Duration(seconds: 3));
-
-    setState(() {
-      currentStat = 'Setting up User Types...';
-    });
-
-    final res=await ApiClient(navigatorKey: navigatorKey).get("/api/UserType");
-    List<UserRole> userRoles=[];
-
-    for (var data in res.data){
-      if(data != null){
-        userRoles.add(UserRole.fromJson(data));
-      }
+    // Load user roles
+    setState(() => currentStat = 'Setting up User Types...');
+    final userRes =
+        await ApiClient(navigatorKey: navigatorKey).get("/api/UserType");
+    List<UserRole> userRoles = [];
+    for (var data in userRes.data) {
+      if (data != null) userRoles.add(UserRole.fromJson(data));
     }
-
     ref.read(appConfigProvider.notifier).setUserRoles(userRoles);
 
-    setState(() {
-      currentStat = 'Setting up Business Types...';
-    });
-
-    final businessTypesRes=await ApiClient(navigatorKey: navigatorKey).get("/api/businessType");
-    List<BusinessType> businessTypes=[];
-
-    for (var data in businessTypesRes.data){
-      if(data != null){
-        businessTypes.add(BusinessType.fromJson(data));
-      }
+    // Load business types
+    setState(() => currentStat = 'Setting up Business Types...');
+    final bizRes =
+        await ApiClient(navigatorKey: navigatorKey).get("/api/businessType");
+    List<BusinessType> businessTypes = [];
+    for (var data in bizRes.data) {
+      if (data != null) businessTypes.add(BusinessType.fromJson(data));
     }
-
     ref.read(appConfigProvider.notifier).setBusinessTypes(businessTypes);
 
-
     if (!mounted) return;
-    Navigator.pushReplacementNamed(context, '/onboarding');
+
+    // Check if user is already logged in
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    if (token != null && token.isNotEmpty) {
+      setState(() => currentStat = 'Loading profile...');
+
+      try {
+        final profileRes = await ApiClient(navigatorKey: navigatorKey).get('/api/profile');
+        final user = profileRes.data['user'] as Map<String, dynamic>;
+
+        final isOnboarded = user['isOnboarded'] as bool? ?? false;
+        final onboardingStep = user['onBoardingStep'] as int? ?? 0;
+
+        // Sync SharedPreferences with fresh data
+        await prefs.setBool('isOnboarded', isOnboarded);
+        await prefs.setInt('userOnBoardingStep', onboardingStep);
+
+        if (!mounted) return;
+
+        String route;
+        if (isOnboarded) {
+          route = '/list';
+        } else if (onboardingStep <= 1) {
+          route = '/onboarding';
+        } else {
+          route = '/categories';
+        }
+
+        Navigator.pushReplacementNamed(context, route);
+      } catch (_) {
+        // Token invalid or expired — send to login
+        await prefs.remove('token');
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/login');
+      }
+    } else {
+      Navigator.pushReplacementNamed(context, '/login');
+    }
   }
 
   @override
@@ -87,7 +101,6 @@ class _MainLoadingScreenState extends ConsumerState<MainLoadingScreen> {
               fit: BoxFit.cover,
             ),
           ),
-
           Positioned(
             left: 30,
             right: 30,
@@ -97,7 +110,7 @@ class _MainLoadingScreenState extends ConsumerState<MainLoadingScreen> {
               children: [
                 Text(
                   currentStat,
-                  style: TextStyle(color: Colors.white, fontSize: 14),
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
                 ),
                 const SizedBox(height: 12),
                 ClipRRect(

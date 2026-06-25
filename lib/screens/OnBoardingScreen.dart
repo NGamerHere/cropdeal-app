@@ -27,6 +27,7 @@ class _OnBoardingScreenState extends ConsumerState<OnBoardingScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController(text: "Ramesh Kumar");
   final TextEditingController _phoneController = TextEditingController(text: "99592 88004");
+  final TextEditingController _emailController = TextEditingController(text: "ramesh@example.com");
 
   UserRole? selectedUserType;
   BusinessType? selectedBusinessType;
@@ -51,6 +52,8 @@ class _OnBoardingScreenState extends ConsumerState<OnBoardingScreen> {
   List<Area> _areas = [];
   Area? _selectedArea;
   bool _loadingAreas = false;
+
+  bool _isLoading = false;
 
   File? _profileImage;
   String? profileKey = '';
@@ -221,6 +224,61 @@ class _OnBoardingScreenState extends ConsumerState<OnBoardingScreen> {
   }
 
   // -------------------------------------------------------
+  //  Submit onboarding
+  // -------------------------------------------------------
+
+  Future<void> _submitOnboarding() async {
+    if (_nameController.text.trim().isEmpty) {
+      _showSnack('Please enter your name');
+      return;
+    }
+    if (_emailController.text.trim().isEmpty) {
+      _showSnack('Please enter your email');
+      return;
+    }
+    if (selectedUserType == null) {
+      _showSnack('Please select a user type');
+      return;
+    }
+    if (selectedBusinessType == null) {
+      _showSnack('Please select a business type');
+      return;
+    }
+    if (_selectedArea == null) {
+      _showSnack('Please select your location');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      await _api.post('/api/profile/onboard', data: {
+        'name': _nameController.text.trim(),
+        'email': _emailController.text.trim(),
+        'profile_pic_key': profileKey ?? '',
+        'AreaId': _selectedArea!.id,
+        'BusinessTypeId': selectedBusinessType!.id,
+        'UserRoleId': selectedUserType!.id,
+      });
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/categories');
+    } catch (e) {
+      if (mounted) _showSnack('Failed to save profile. Try again.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _showSnack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: const Color(0xFF0F9D1E),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  // -------------------------------------------------------
   //  Location summary
   // -------------------------------------------------------
 
@@ -372,6 +430,19 @@ class _OnBoardingScreenState extends ConsumerState<OnBoardingScreen> {
                                 ),
                               ),
                             ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          // ---- Email ----
+                          _buildFieldLabel(Icons.email_outlined, "Email"),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            style: const TextStyle(fontSize: 14),
+                            decoration: _buildInputDecoration(
+                              suffixIcon: const Icon(Icons.email_outlined, color: Colors.grey, size: 18),
+                            ),
                           ),
                           const SizedBox(height: 16),
 
@@ -645,19 +716,24 @@ class _OnBoardingScreenState extends ConsumerState<OnBoardingScreen> {
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                 elevation: 0,
                               ),
-                              onPressed: () {
-                                if (_formKey.currentState?.validate() ?? false) {
-                                  // Continue navigation routing setup
-                                }
-                              },
-                              child: const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text("Continue", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                                  SizedBox(width: 8),
-                                  Icon(Icons.arrow_forward, size: 18),
-                                ],
-                              ),
+                              onPressed: _isLoading ? null : _submitOnboarding,
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text("Continue", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                        SizedBox(width: 8),
+                                        Icon(Icons.arrow_forward, size: 18),
+                                      ],
+                                    ),
                             ),
                           ),
                           const SizedBox(height: 14),
