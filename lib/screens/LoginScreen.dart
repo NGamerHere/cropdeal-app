@@ -273,6 +273,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             const SizedBox(height: 15),
                             Pinput(
+                              autofocus: true,
                               length: 4,
                               defaultPinTheme: defaultPinTheme,
                               focusedPinTheme:

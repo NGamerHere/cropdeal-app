@@ -1,5 +1,6 @@
 import 'package:cropdeal/main.dart' show navigatorKey;
 import 'package:cropdeal/models/BusinessType.dart';
+import 'package:cropdeal/models/User.dart';
 import 'package:cropdeal/models/UserRole.dart';
 import 'package:cropdeal/services/ApiClient.dart';
 import 'package:flutter/material.dart';
@@ -58,10 +59,13 @@ class _MainLoadingScreenState extends ConsumerState<MainLoadingScreen> {
 
       try {
         final profileRes = await ApiClient(navigatorKey: navigatorKey).get('/api/profile');
-        final user = profileRes.data['user'] as Map<String, dynamic>;
+        final userData = profileRes.data['user'] as Map<String, dynamic>;
 
-        final isOnboarded = user['isOnboarded'] as bool? ?? false;
-        final onboardingStep = user['onBoardingStep'] as int? ?? 0;
+        final user = User.fromJson(userData);
+        ref.read(appConfigProvider.notifier).setUser(user);
+
+        final isOnboarded = user.isOnboarded;
+        final onboardingStep = user.onBoardingStep;
 
         // Sync SharedPreferences with fresh data
         await prefs.setBool('isOnboarded', isOnboarded);
@@ -72,14 +76,15 @@ class _MainLoadingScreenState extends ConsumerState<MainLoadingScreen> {
         String route;
         if (isOnboarded) {
           route = '/list';
-        } else if (onboardingStep <= 1) {
+        } else if (onboardingStep <= 2) {
           route = '/onboarding';
         } else {
           route = '/categories';
         }
 
         Navigator.pushReplacementNamed(context, route);
-      } catch (_) {
+      } catch (e) {
+        debugPrint('MainLoadingScreen: Auto-login failed — $e');
         // Token invalid or expired — send to login
         await prefs.remove('token');
         if (!mounted) return;

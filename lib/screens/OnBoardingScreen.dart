@@ -254,7 +254,7 @@ class _OnBoardingScreenState extends ConsumerState<OnBoardingScreen> {
       await _api.post('/api/profile/onboard', data: {
         'name': _nameController.text.trim(),
         'email': _emailController.text.trim(),
-        'profile_pic_key': profileKey ?? '',
+        'profilePicKey': profileKey ?? '',
         'AreaId': _selectedArea!.id,
         'BusinessTypeId': selectedBusinessType!.id,
         'UserRoleId': selectedUserType!.id,

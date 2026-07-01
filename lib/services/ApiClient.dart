@@ -7,6 +7,13 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../components/AppVersionHelper.dart';
 import '../components/DeviceIdGenerator.dart';
 
+class _PendingRequest {
+  final RequestOptions options;
+  final ErrorInterceptorHandler handler;
+
+  _PendingRequest({required this.options, required this.handler});
+}
+
 class ApiClient {
   static final ApiClient _instance = ApiClient._internal();
   static GlobalKey<NavigatorState>? _navigatorKey;
@@ -21,6 +28,9 @@ class ApiClient {
   }
 
   late final Dio _dio;
+  late final Dio _refreshDio;
+  bool _isRefreshing = false;
+  final List<_PendingRequest> _pendingRequests = [];
 
   String get baseUrl => _dio.options.baseUrl;
 
@@ -30,6 +40,15 @@ class ApiClient {
         baseUrl: '${dotenv.env['API_BASE_URL']!}',
         connectTimeout: const Duration(seconds: 30),
         receiveTimeout: const Duration(seconds: 600),
+      ),
+    );
+
+    // Separate Dio instance for refresh calls to avoid interceptor loops
+    _refreshDio = Dio(
+      BaseOptions(
+        baseUrl: '${dotenv.env['API_BASE_URL']!}',
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
       ),
     );
 
@@ -84,10 +103,103 @@ class ApiClient {
           final statusCode = e.response?.statusCode;
           print("❌ [$statusCode] ${e.requestOptions.uri}");
           print("🧨 Error: ${e.message}");
+
+          // Skip refresh logic for the refresh endpoint itself
+          if (e.requestOptions.path.contains('/api/auth/refresh')) {
+            handler.next(e);
+            return;
+          }
+
+          // Handle 401 with token refresh
+          if (statusCode == 401) {
+            if (_isRefreshing) {
+              // Another refresh is in progress — queue this request
+              _pendingRequests.add(_PendingRequest(
+                options: e.requestOptions,
+                handler: handler,
+              ));
+              return;
+            }
+
+            _isRefreshing = true;
+
+            try {
+              final prefs = await SharedPreferences.getInstance();
+              final refreshToken = prefs.getString('refreshToken') ?? '';
+              final currentToken = prefs.getString('token') ?? '';
+
+              if (refreshToken.isEmpty || currentToken.isEmpty) {
+                await _clearTokensAndGoToLogin();
+                handler.next(e);
+                return;
+              }
+
+              // Call refresh endpoint with the current access token
+              final refreshResponse = await _refreshDio.post(
+                '/api/auth/refresh',
+                options: Options(
+                  headers: {
+                    'Authorization': 'Bearer $currentToken',
+                    'Content-Type': 'application/json',
+                  },
+                ),
+                data: {'refreshToken': refreshToken},
+              );
+
+              final newToken = refreshResponse.data['accessToken'] as String;
+              final newRefreshToken = refreshResponse.data['refreshToken'] as String? ?? '';
+
+              // Store new tokens
+              await prefs.setString('token', newToken);
+              if (newRefreshToken.isNotEmpty) {
+                await prefs.setString('refreshToken', newRefreshToken);
+              }
+
+              // Retry all queued requests with the new token
+              final queued = List<_PendingRequest>.from(_pendingRequests);
+              _pendingRequests.clear();
+
+              for (final pending in queued) {
+                pending.options.headers['Authorization'] = 'Bearer $newToken';
+                try {
+                  final resp = await _dio.fetch(pending.options);
+                  pending.handler.resolve(resp);
+                } catch (err) {
+                  pending.handler.next(err as DioException);
+                }
+              }
+
+              // Retry the current failed request
+              final opts = e.requestOptions;
+              opts.headers['Authorization'] = 'Bearer $newToken';
+              final response = await _dio.fetch(opts);
+              handler.resolve(response);
+            } catch (_) {
+              // Refresh failed — clear everything and send to login
+              _pendingRequests.clear();
+              await _clearTokensAndGoToLogin();
+              handler.next(e);
+            } finally {
+              _isRefreshing = false;
+            }
+            return;
+          }
+
           handler.next(e);
         },
       ),
     );
+  }
+
+  Future<void> _clearTokensAndGoToLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('token');
+    await prefs.remove('refreshToken');
+
+    final context = _navigatorKey?.currentContext;
+    if (context != null && context.mounted) {
+      Navigator.of(context).pushReplacementNamed('/login');
+    }
   }
 
   Future<Response> _makeRequest(

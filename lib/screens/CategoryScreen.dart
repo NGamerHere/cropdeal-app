@@ -2,16 +2,19 @@ import 'package:cropdeal/main.dart' as app;
 import 'package:cropdeal/models/Category.dart';
 import 'package:cropdeal/models/Product.dart';
 import 'package:cropdeal/services/ApiClient.dart';
+import 'package:cropdeal/stateNotifiers/AppConfigNotifier.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
-class CategoryScreen extends StatefulWidget {
+class CategoryScreen extends ConsumerStatefulWidget {
   const CategoryScreen({super.key});
 
   @override
-  State<CategoryScreen> createState() => _CategoryScreenState();
+  ConsumerState<CategoryScreen> createState() => _CategoryScreenState();
 }
 
-class _CategoryScreenState extends State<CategoryScreen> {
+class _CategoryScreenState extends ConsumerState<CategoryScreen> {
   final ApiClient _apiClient = ApiClient(navigatorKey: app.navigatorKey);
 
   List<Category> _mainCategories = [];
@@ -27,18 +30,35 @@ class _CategoryScreenState extends State<CategoryScreen> {
   bool _isSubmitting = false;
 
   // ── Design tokens (matching Figma) ──
-  static const _bgColor       = Color(0xFFF5F7F2);
-  static const _primaryGreen  = Color(0xFF1B5E20);
-  static const _accentGreen   = Color(0xFF2E7D32);
-  static const _chipGreen     = Color(0xFF4CAF50);
-  static const _sidebarBg     = Color(0xFFFFFFFF);
-  static const _sidebarSelBg  = Color(0xFFF1F8E9);
-  static const _textDark      = Color(0xFF1C2B1E);
-  static const _textMuted     = Color(0xFF78909C);
-  static const _divider       = Color(0xFFE0E0E0);
-    static const _sidebarWidth  = 88.0;
+  static const _bgColor      = Color(0xFFF5F7F2);
+  static const _primaryGreen = Color(0xFF1B5E20);
+  static const _accentGreen  = Color(0xFF2E7D32);
+  static const _chipGreen    = Color(0xFF4CAF50);
+  static const _sidebarBg   = Color(0xFFFFFFFF);
+  static const _sidebarSelBg = Color(0xFFF1F8E9);
+  static const _textDark     = Color(0xFF1C2B1E);
+  static const _textMuted    = Color(0xFF78909C);
+  static const _divider      = Color(0xFFE0E0E0);
+  static const _sidebarWidth = 88.0;
 
-  // Category → icon mapping (Figma uses image circles; we use icons as fallback)
+  // ── Stock photo fallbacks per category keyword (Unsplash) ──
+  // Used when category.imageUrl is null/empty.
+  static const Map<String, String> _catStockPhotos = {
+    'crop':       'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=200&q=80',
+    'crops':      'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=200&q=80',
+    'aqua':       'https://images.unsplash.com/photo-1534043464124-3be32fe000c9?w=200&q=80',
+    'aquaculture':'https://images.unsplash.com/photo-1534043464124-3be32fe000c9?w=200&q=80',
+    'livestock':  'https://images.unsplash.com/photo-1527153818091-1a9638521e2a?w=200&q=80',
+    'live stock': 'https://images.unsplash.com/photo-1527153818091-1a9638521e2a?w=200&q=80',
+    'dairy':      'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=200&q=80',
+    'fertilizer': 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=200&q=80',
+    'seeds':      'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=200&q=80',
+    'vegetables': 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=200&q=80',
+    'fruits':     'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=200&q=80',
+    'poultry':    'https://images.unsplash.com/photo-1548550023-2bdb3c5beed7?w=200&q=80',
+  };
+
+  // Icon fallback (used only when image also fails to load)
   static const Map<String, IconData> _catIcons = {
     'crop':       Icons.eco_rounded,
     'aqua':       Icons.set_meal_rounded,
@@ -48,7 +68,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
     'fertilizer': Icons.science_rounded,
   };
 
-  // Category → tint colour for the sidebar icon circle
+  // Tint colour for the fallback icon circle
   static const Map<String, Color> _catColors = {
     'crop':       Color(0xFF43A047),
     'aqua':       Color(0xFF0288D1),
@@ -68,6 +88,96 @@ class _CategoryScreenState extends State<CategoryScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  // ── Helpers ──
+
+  /// Returns the best image URL for a category:
+  /// 1. category.imageUrl (from API)
+  /// 2. Stock photo mapped by category name keyword
+  /// 3. null → show icon fallback
+  String? _imageUrlFor(Category cat) {
+    if (cat.imageKey != null && cat.imageKey!.isNotEmpty) return cat.imageKey;
+    final key = cat.name.toLowerCase();
+    // Try exact match first, then partial match
+    if (_catStockPhotos.containsKey(key)) return _catStockPhotos[key];
+    for (final entry in _catStockPhotos.entries) {
+      if (key.contains(entry.key) || entry.key.contains(key)) return entry.value;
+    }
+    return null;
+  }
+
+  /// Circular image widget used in both the sidebar and subcategory chips.
+  ///
+  /// [size]       — diameter of the circle
+  /// [cat]        — category to resolve image/icon for
+  /// [selected]   — whether to show the selection border
+  /// [borderColor]— color of the selection ring
+  Widget _buildCategoryCircle({
+    required double size,
+    required Category cat,
+    required bool selected,
+    Color borderColor = _chipGreen,
+  }) {
+    final imageUrl = _imageUrlFor(cat);
+    final key = cat.name.toLowerCase();
+    final tint = _catColors[key] ?? _accentGreen;
+    final icon = _catIcons[key] ?? Icons.category_rounded;
+
+    final border = selected
+        ? Border.all(color: borderColor, width: 2.5)
+        : Border.all(color: _divider, width: 1.5);
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: border,
+        color: tint.withOpacity(0.1),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: imageUrl != null
+          ? CachedNetworkImage(
+        imageUrl: imageUrl,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => _buildImagePlaceholder(size, tint),
+        errorWidget: (context, url, error) => _buildIconFallback(icon, tint),
+      )
+          : _buildIconFallback(icon, tint),
+    );
+  }
+
+  Widget _buildImagePlaceholder(double size, Color tint) {
+    return Container(
+      color: tint.withOpacity(0.08),
+      child: Center(
+        child: SizedBox(
+          width: size * 0.35,
+          height: size * 0.35,
+          child: CircularProgressIndicator(
+            strokeWidth: 1.5,
+            color: tint.withOpacity(0.4),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIconFallback(IconData icon, Color tint) {
+    return Center(child: Icon(icon, color: tint, size: 22));
+  }
+
+  Widget _defaultAvatar() {
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: _accentGreen.withOpacity(0.15),
+        shape: BoxShape.circle,
+      ),
+      child: const Icon(Icons.person, color: _accentGreen, size: 20),
+    );
   }
 
   // ── Data ──
@@ -152,7 +262,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
       );
       if (!mounted) return;
       _showSnack('Interests saved!');
-      // TODO: navigate to next screen
+      Navigator.pushReplacementNamed(context, '/login');
     } catch (_) {
       if (mounted) _showSnack('Submission failed. Try again.');
     } finally {
@@ -177,7 +287,6 @@ class _CategoryScreenState extends State<CategoryScreen> {
     return _products.where((p) => p.name.toLowerCase().contains(q)).toList();
   }
 
-  /// Returns a list of mixed items: String (letter header) or Product.
   List<dynamic> get _groupedItems {
     final sorted = List<Product>.from(_filteredProducts)
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
@@ -228,16 +337,65 @@ class _CategoryScreenState extends State<CategoryScreen> {
     );
   }
 
-  // ── Top header (matches Figma: white search bar, title, subtitle) ──
+  // ── Top header ──
 
   Widget _buildHeader() {
+    final user = ref.watch(appConfigProvider).user;
+
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Search bar
+          if (user != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: user.profilePhoto != null
+                        ? CachedNetworkImage(
+                            imageUrl: user.profilePhoto!,
+                            width: 36,
+                            height: 36,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => Container(
+                              width: 36,
+                              height: 36,
+                              color: Colors.grey.shade200,
+                            ),
+                            errorWidget: (_, __, ___) => _defaultAvatar(),
+                          )
+                        : _defaultAvatar(),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Hi ${user.name.split(' ').first} 👋',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: _textDark,
+                          ),
+                        ),
+                        Text(
+                          'Select the products you deal with',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: _textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Container(
             height: 44,
             decoration: BoxDecoration(
@@ -296,11 +454,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
         padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: _mainCategories.length,
         itemBuilder: (_, i) {
-          final cat     = _mainCategories[i];
+          final cat      = _mainCategories[i];
           final selected = cat.id == _selectedMainCategory?.id;
-          final key     = cat.name.toLowerCase();
-          final color   = _catColors[key] ?? _accentGreen;
-          final icon    = _catIcons[key]  ?? Icons.category_rounded;
 
           return GestureDetector(
             onTap: () => _selectMainCategory(cat),
@@ -316,18 +471,11 @@ class _CategoryScreenState extends State<CategoryScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Icon circle
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: color.withOpacity(0.12),
-                      border: selected
-                          ? Border.all(color: color, width: 2)
-                          : null,
-                    ),
-                    child: Icon(icon, color: color, size: 22),
+                  _buildCategoryCircle(
+                    size: 48,
+                    cat: cat,
+                    selected: selected,
+                    borderColor: selected ? _chipGreen : _divider,
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -370,13 +518,12 @@ class _CategoryScreenState extends State<CategoryScreen> {
     );
   }
 
-  // ── Subcategory horizontal chips (image circles like Figma) ──
+  // ── Subcategory horizontal chips ──
 
   Widget _buildSubCategoryRow() {
     final subs = _selectedMainCategory?.subCategories ?? [];
     if (subs.isEmpty) return const SizedBox(height: 4);
 
-    // Section header
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -407,24 +554,10 @@ class _CategoryScreenState extends State<CategoryScreen> {
                   margin: const EdgeInsets.only(right: 10),
                   child: Column(
                     children: [
-                      // Circle chip
-                      Container(
-                        width: 62,
-                        height: 62,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: selected
-                              ? _accentGreen.withOpacity(0.1)
-                              : const Color(0xFFF0F0F0),
-                          border: selected
-                              ? Border.all(color: _chipGreen, width: 2.5)
-                              : Border.all(color: _divider, width: 1.5),
-                        ),
-                        child: Icon(
-                          _catIcons[sub.name.toLowerCase()] ?? Icons.eco_rounded,
-                          color: selected ? _accentGreen : _textMuted,
-                          size: 26,
-                        ),
+                      _buildCategoryCircle(
+                        size: 62,
+                        cat: sub,
+                        selected: selected,
                       ),
                       const SizedBox(height: 5),
                       Text(
@@ -450,7 +583,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
     );
   }
 
-  // ── Inline product search bar (inside content area) ──
+  // ── Inline product search bar ──
 
   Widget _buildProductSearchBar() {
     return Padding(
@@ -495,7 +628,9 @@ class _CategoryScreenState extends State<CategoryScreen> {
             Icon(Icons.search_off_rounded, size: 48, color: _textMuted.withOpacity(.5)),
             const SizedBox(height: 10),
             Text(
-              _searchQuery.isNotEmpty ? 'No results for "$_searchQuery"' : 'No products here',
+              _searchQuery.isNotEmpty
+                  ? 'No results for "$_searchQuery"'
+                  : 'No products here',
               style: const TextStyle(color: _textMuted, fontSize: 13),
             ),
           ],
@@ -503,7 +638,6 @@ class _CategoryScreenState extends State<CategoryScreen> {
       );
     }
 
-    // Section title above list
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -526,7 +660,6 @@ class _CategoryScreenState extends State<CategoryScreen> {
             itemBuilder: (_, i) {
               final item = items[i];
               if (item is String) {
-                // Letter header
                 return Padding(
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
                   child: Text(
@@ -539,7 +672,6 @@ class _CategoryScreenState extends State<CategoryScreen> {
                   ),
                 );
               }
-              // Product row
               final product  = item as Product;
               final selected = _selectedProductIds.contains(product.id);
               return _buildProductRow(product, selected);
@@ -560,18 +692,38 @@ class _CategoryScreenState extends State<CategoryScreen> {
         ),
         child: Row(
           children: [
-            // Product icon placeholder circle
+            // Product image circle — uses product.imageUrl if available
             Container(
               width: 36,
               height: 36,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFE8F5E9),
+                color: Color(0xFFE8F5E9),
               ),
-              child: const Icon(Icons.eco_rounded, color: _accentGreen, size: 18),
+              clipBehavior: Clip.antiAlias,
+              child: (product.imageUrl != null && product.imageUrl!.isNotEmpty)
+                  ? CachedNetworkImage(
+                imageUrl: product.imageUrl!,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => const Center(
+                  child: SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.5,
+                      color: _accentGreen,
+                    ),
+                  ),
+                ),
+                errorWidget: (_, __, ___) => const Icon(
+                  Icons.eco_rounded,
+                  color: _accentGreen,
+                  size: 18,
+                ),
+              )
+                  : const Icon(Icons.eco_rounded, color: _accentGreen, size: 18),
             ),
             const SizedBox(width: 12),
-            // Name + description
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -597,7 +749,6 @@ class _CategoryScreenState extends State<CategoryScreen> {
               ),
             ),
             const SizedBox(width: 12),
-            // Circular checkbox (Figma style)
             AnimatedContainer(
               duration: const Duration(milliseconds: 150),
               width: 26,
@@ -620,7 +771,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
     );
   }
 
-  // ── Bottom bar (matches Figma: green check icon + count + Continue button) ──
+  // ── Bottom bar ──
 
   Widget _buildBottomBar() {
     final count = _selectedProductIds.length;
@@ -632,7 +783,6 @@ class _CategoryScreenState extends State<CategoryScreen> {
       ),
       child: Row(
         children: [
-          // Left: selected count badge
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 200),
             child: count > 0
@@ -673,7 +823,6 @@ class _CategoryScreenState extends State<CategoryScreen> {
                 : const SizedBox.shrink(key: ValueKey(0)),
           ),
           const Spacer(),
-          // Continue button
           SizedBox(
             height: 46,
             child: FilledButton.icon(

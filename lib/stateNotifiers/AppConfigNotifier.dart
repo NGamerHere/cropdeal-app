@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/AppConfigData.dart';
 import 'package:cropdeal/models/BusinessType.dart';
 import 'package:cropdeal/models/UserRole.dart';
+import 'package:cropdeal/models/User.dart';
 
 import '../models/State.dart';
 
@@ -27,6 +28,10 @@ class AppConfigNotifier extends Notifier<AppConfigState> {
 
   void setBusinessTypes(List<BusinessType> types) {
     state = state.copyWith(businessTypes: types);
+  }
+
+  void setUser(User user) {
+    state = state.copyWith(user: user);
   }
 }
 final appConfigProvider =
